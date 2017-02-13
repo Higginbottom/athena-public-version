@@ -338,7 +338,7 @@ int main(int argc, char *argv[])
   while ((pmesh->time < pmesh->tlim) && 
          (pmesh->nlim < 0 || pmesh->ncycle < pmesh->nlim)){
 
-    if(Globals::my_rank==0) {
+    if(Globals::my_rank==0 && (pmesh->nlim>0 || pmesh->ncycle%1000==0)) {
       std::cout << "cycle=" << pmesh->ncycle << std::scientific <<std::setprecision(14)
                 << " time=" << pmesh->time << " dt=" << pmesh->dt <<std::endl;
     }
