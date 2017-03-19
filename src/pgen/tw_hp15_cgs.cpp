@@ -51,6 +51,9 @@
 #define tdyn_over_tth 1.0
 /***********************************/
 
+#define k_B 1.38e-16;
+#define m_p 1.67e-24;
+
 #define Gc_fac 8.890467707253008e-36 //used in H/C models below
 //#define T_x 1.16e8  // 10 keV 
 #define T_x 5.6e7  // 4.826 keV used in HP15 
@@ -122,7 +125,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   return;
 }
 
-Real solve4pressure(const Real dt, const Real d, const Real p, const Real r, const int i);
+Real solve4pressure(const Real dt, const Real d, const Real p, const Real r, const int i, const Real theta, const int j);
 
 int bracket_root(const Real dt, const Real d, const Real p_old, const Real r, Real* pL, Real* pR, int);
 
@@ -170,10 +173,10 @@ Real tabularHC(const Real d, const Real p, const Real r)
 //   printf ("T=%e T0=%e Gamma=%e gm1=%e p=%e d=%e xi=%e blondin_hc=%e\n",T,T0,Gamma,gm1,p,d,xi,blondin_hc(T,xi));
 #endif
   
-//    if (xi<1.3e+03)
-//	  {
- //	    printf ("d=%e xi=%e T=%e hc=%e\n",d,xi,T,hc_rate/n_e/n_h);
-//		}
+//      if (d>8e-10)
+//	  	  {
+//			  	    printf ("d=%e xi=%e T=%e hc=%e\n",d,xi,T,hc_rate/n_e/n_h);
+//							}
 
   
   return hc_rate; 
@@ -188,6 +191,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real d_atmsph,p_atmsph,p_disk;
   Real deg = 180./PI;
   Real e_disk,e_atmsph;
+  Real c_s;
   
 
 
@@ -199,8 +203,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 #else
   hc_norm = 1./blondin_h(T0,xi_disk);
 #endif 
+  e_disk=3./2.*rho_0*1.38e-16*T0/0.6/1.67e-24;
   
+    c_s=sqrt(Gamma*gm1*e_disk/rho_0);
   
+printf ("e_disk=%e speed of sound at disk=%e time scale=%e\n",e_disk,c_s,R_IC/c_s/c_s);
   
   // Midplane values
   for (int i=is; i<=ie+2; i++) 
@@ -217,6 +224,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 //    p_disk = phydro->u(IDN,ks,je,i)/Gamma; // T0 = Gamma*p_disk/d 
     //p_disk = root_bisection(phydro->u(IDN,ks,je,i),r); // equivalent: solve for T0=T_eq given xi_disk
     e_disk=3./2.*phydro->u(IDN,ks,je,i)*1.38e-16*T0/0.6/1.67e-24;
+	
 	
 	
     // total energy
@@ -252,7 +260,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       vt = phydro->u(IM2,k,j,i)/phydro->u(IDN,k,j,i);
       vp = phydro->u(IM3,k,j,i)/phydro->u(IDN,k,j,i);
       p = gm1*(phydro->u(IEN,k,j,i) - 0.5*phydro->u(IDN,k,j,i)*(SQR(vt) + SQR(vp)));
-      T = T0*(Gamma*p/d);
+	  T = 0.6*1.67e-24*p/1.38e-16/d;
       xi = L_x*1.67e-24*1.41/r/r/d;
 	        printf("ALONG DISK: i = %2d r(R_IC) = %.4f  (d,M,E) = (%.4e,%.4e,%.4e)  (xi,T) = (%.4e,%.4e) \n",
 			      i,r,phydro->u(IDN,k,j,i),phydro->u(IM3,k,j,i),phydro->u(IEN,k,j,i),xi,T);
@@ -270,7 +278,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 	  
       x = r*sin(theta);
       z = r*cos(theta);
-      T = T0*(Gamma*p/d);
+      p = gm1*(phydro->u(IEN,k,j,i) - 0.5*phydro->u(IDN,k,j,i)*(SQR(vt) + SQR(vp)));
+	  
+	  T = 0.6*1.67e-24*p/1.38e-16/d;
       xi = L_x*1.67e-24*1.41/r/r/d;
       printf("ALONG POLE: i = %2d x = %.4f z = %.4f (d,M,E) = (%.4e,%.4e,%.4e) (xi,T) = (%.4e,%.4e) \n",
       i,x,z,phydro->u(IDN,k,j,i),phydro->u(IM3,k,j,i),phydro->u(IEN,k,j,i),xi,T);     
@@ -286,7 +296,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 	  
       x = r*sin(theta);
       z = r*cos(theta);
-      T = T0*(Gamma*p/d);
+      p = gm1*(phydro->u(IEN,k,j,i) - 0.5*phydro->u(IDN,k,j,i)*(SQR(vt) + SQR(vp)));
+	  
+	  T = 0.6*1.67e-24*p/1.38e-16/d;
       xi = L_x*1.67e-24*1.41/r/r/d;
 	  printf("ALONG R_IN: j = %2d r = %.4f theta = %.4f (d,M,E) = (%.4e,%.4e,%.4e) (xi,T) = (%.4e,%.4e) \n",
 	  j,r,theta*deg,phydro->u(IDN,k,j,i),phydro->u(IM3,k,j,i),phydro->u(IEN,k,j,i),xi,T);     
@@ -302,7 +314,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 	  
       x = r*sin(theta);
       z = r*cos(theta);
-      T = T0*(Gamma*p/d);
+      p = gm1*(phydro->u(IEN,k,j,i) - 0.5*phydro->u(IDN,k,j,i)*(SQR(vt) + SQR(vp)));
+	  
+	  T = 0.6*1.67e-24*p/1.38e-16/d;
       xi = L_x*1.67e-24*1.41/r/r/d;
 	  printf("ALONG R_OUT: j = %2d r = %.4f theta = %.4f (d,M,E) = (%.4e,%.4e,%.4e) (xi,T) = (%.4e,%.4e) \n",
 	  j,r,theta*deg,phydro->u(IDN,k,j,i),phydro->u(IM3,k,j,i),phydro->u(IEN,k,j,i),xi,T);     
@@ -324,6 +338,8 @@ void MeshBlock::UserWorkInLoop(void)
     for (int i = is; i <=ie; ++i)
       {
 		  
+// 		 if (phydro->u(IDN,k,je,i)>8e-10)
+ //			 printf("old density=%e %e new density=%e\n",phydro->u(IDN,k,je,i),phydro->u(IDN,k,je-1,i),rho_0*pow(pcoord->x1v(i)/R_IC,-2.));
 		  
         phydro->u(IDN,k,je,i) = rho_0*pow(pcoord->x1v(i)/R_IC,-2.);
 
@@ -335,15 +351,14 @@ void MeshBlock::UserWorkInLoop(void)
 		
 		
 		
-        kinetic_energy = 0.5*(SQR(phydro->u(IM2,k,je,i)) + SQR(phydro->u(IM3,k,je,i)))/phydro->u(IDN,k,je,i);
+		        kinetic_energy = 0.5*(SQR(phydro->u(IM2,k,je,i)) + SQR(phydro->u(IM3,k,je,i)))/phydro->u(IDN,k,je,i);
 		
-//	    p_disk = phydro->u(IDN,k,je,i)/Gamma; // T0 = Gamma*p_disk/d 
+	    p_disk = phydro->u(IDN,k,je,i)/Gamma; // T0 = Gamma*p_disk/d 
 		
-	    e_disk=3./2.*phydro->u(IDN,k,je,i)*1.38e-16*T0/0.6/1.67e-24;
+			    e_disk=3./2.*phydro->u(IDN,k,je,i)*1.38e-16*T0/0.6/1.67e-24;
 		
 		
-				
-        phydro->u(IEN,k,je,i) = e_disk + kinetic_energy; 
+		      phydro->u(IEN,k,je,i) = e_disk + kinetic_energy; 
       }
    
   /*  Verify that disk stays at 10^4 K 
@@ -363,11 +378,14 @@ void MeshBlock::UserWorkInLoop(void)
 void HeatingAndCooling(MeshBlock *pmb, const Real time, const Real dt,
   const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc, AthenaArray<Real> &cons)
 {
-  Real dens,pres,radius,RHS;
+  Real dens,pres,radius,theta,RHS;
   Coordinates *pco = pmb->pcoord;
   Real xi,T,HC,dtrhoL;
+  Real kinetic_energy;
+  Real internal_energy;
   Real sign,pres_floor;
   Real RHSmax;
+  Real new_temp;
   Real v,p_root;
   
   
@@ -375,22 +393,37 @@ void HeatingAndCooling(MeshBlock *pmb, const Real time, const Real dt,
 		 	    cout << "cycle = " << pmb->pmy_mesh->ncycle << " dt = " << dt << endl;
   
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
-  for (int j=pmb->js; j<pmb->je; ++j) {
+  for (int j=pmb->js; j<=pmb->je; ++j) {
     //Real phi=pmb->pcoord->x2v(j) ;
     for (int i=pmb->is; i<=pmb->ie; ++i) {
       // update energy equation 
       dens = prim(IDN,k,j,i);
       pres = prim(IEN,k,j,i);
       radius = pco->x1v(i);
+      theta = pco->x2v(j);
 
 /* Implicit method */
-  p_root = solve4pressure(dt,dens,pres,radius,i);
+  p_root = solve4pressure(dt,dens,pres,radius,i,theta,j);
 #ifdef DEBUG_SOLUTION
   cout << i << ": p_old = " << pres << "; p_new = " << p_root << endl;
 #endif
   RHS = dt*tabularHC(dens,p_root,radius);
   dtrhoL = RHS;
+
   cons(IEN,k,j,i) -= RHS;
+  
+  
+  kinetic_energy = 0.5*(SQR(prim(IM2,k,j,i)) + SQR(prim(IM3,k,j,i)))*dens;
+  
+  internal_energy=cons(IEN,k,j,i)-kinetic_energy;
+	  
+	  new_temp=internal_energy*(2./3.)*0.6*m_p;
+	  new_temp=new_temp/dens/k_B;
+  
+//  if (j==pmb->je-10 )
+//	  printf ("r=%e dens=%e old pressure=%e root=%e old temp=%e new temp=%e\n",radius,dens,pres,p_root,0.6*1.67e-24*pres/1.38e-16/dens,new_temp);
+  
+  
 #ifdef DEBUG_SOLUTION
   cout << "Etot = " << cons(IEN,k,j,i) << "RHS = " << RHS << endl;
 #endif     
@@ -412,7 +445,7 @@ void HeatingAndCooling(MeshBlock *pmb, const Real time, const Real dt,
   
 }
 
-Real solve4pressure(const Real dt, const Real d, const Real p, const Real r, const int i)
+Real solve4pressure(const Real dt, const Real d, const Real p, const Real r, const int i, const Real theta, const int j)
 {
    //first bracket the root
    Real nroots,pL,pR,p_root;
@@ -450,10 +483,10 @@ Real solve4pressure(const Real dt, const Real d, const Real p, const Real r, con
      cout << "Result: nroots = " << nroots << endl;
      stringstream msg;
      msg << "Implicit solve for pressure failed!" << endl;
-     msg << "Setting p_new = p_old at r[" << i << "] = " << r << endl;
-     if (nroots == 0)
+     msg << "Setting p_new = p_old at r[" << i << "] = " << r << "theta[" << j << "] = " << theta << endl;
+//     if (nroots == 0)
        //p_root = p; // equation is very stiff
-       throw runtime_error(msg.str().c_str());
+//       throw runtime_error(msg.str().c_str());
     }
   
 #ifdef STIFF_TRICK  
@@ -476,6 +509,7 @@ int bracket_root(const Real dt, const Real d, const Real p_old, const Real r, Re
   p_min = (hc_xstar.T_min/T0)*d/Gamma + TOL;
   p_max = (hc_xstar.T_max/T0)*d/Gamma - TOL;
   
+
   if (Nbrak > 100)
   {
     p_min = 1e-1*p_min;
@@ -490,6 +524,10 @@ int bracket_root(const Real dt, const Real d, const Real p_old, const Real r, Re
 #else
   p_min = 1e-1*p_old;
   p_max = 1e1*p_old;
+//  if (d>8e-10)
+//	  printf ("p_min=%e p_max=%e NBrak=%i\n",p_min,p_max,Nbrak);
+  
+  
 
   if (Nbrak > 100)
   {
@@ -520,11 +558,14 @@ int bracket_root(const Real dt, const Real d, const Real p_old, const Real r, Re
   
   // algorithm: search all brackets for roots from left to right
   pl = p_min; pr = p_min;
-  p_correction = dt*gm1*tabularHC(d,pl,r);
+  p_correction = d*dt*gm1*tabularHC(d,pl,r);
+//  if (d>8e-10)
+//	  printf ("p_correction=%e\n",p_correction);
+  
   fl = pl - p_old + p_correction;
 #ifdef DEBUG_SOLUTION
   printf("r = %E den = %E pl = %E H/C = %E\n",r,d,pl,tabularHC(d,pl,r));
-  cout << "[bracket root]: p_old = " << p_old << " correction = " << dt*gm1*tabularHC(d,pl,r) << endl;
+  cout << "[bracket root]: p_old = " << p_old << " correction = " << d*dt*gm1*tabularHC(d,pl,r) << endl;
 #endif
 
 #ifdef STIFF_TRICK
@@ -534,7 +575,7 @@ int bracket_root(const Real dt, const Real d, const Real p_old, const Real r, Re
   for (int j=1; j<Nbrak; j++)
   {
       pr += dp;
-      fr = pr - p_old + dt*gm1*tabularHC(d,pr,r);
+      fr = pr - p_old + d*dt*gm1*tabularHC(d,pr,r);
       if (fl*fr <= 0.0)
       {
 		ps_L[++n_ctr-1] = pr-dp;
@@ -570,8 +611,8 @@ Real polish_root(const Real dt, const Real d, const Real p_old, const Real r, co
   while (fabs(dp) > TOL) 
   {
 	 p_root = 0.5*(pl+pr);
-	 fl = pl - p_old + dt*gm1*tabularHC(d,pl,r);
-	 fr = p_root - p_old + dt*gm1*tabularHC(d,p_root,r);
+	 fl = pl - p_old + d*dt*gm1*tabularHC(d,pl,r);
+	 fr = p_root - p_old + d*dt*gm1*tabularHC(d,p_root,r);
 	 if (fl*fr < 0.)
 	   pr  = p_root;
 	 else
